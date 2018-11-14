@@ -1,140 +1,154 @@
 //------------------------------------------------------------------------------------------------------------------------------------
-//-------------------------- No Vars for this assignment!
 require("dotenv").config();
 
 //node module imports needed for functions
-const Spotify = require('node-spotify-api');
+const Spotify = require("node-spotify-api");
 const request = require("request");
-const moment = require('moment');
+const moment = require("moment");
 const fs = require("fs");
 const keys = require("./keys.js"); //file that will direct the terminal to .env file
+var spotify = new Spotify(keys.spotify);
 
-// Establishing the switch cases for the wanted actions of Liri
-LiriCommands();
+// FUNCTIONS
+// =====================================
 
-// My functin for running the commands for liri
-function LiriCommands() {
-    switch (action) {
-        case "ShowEventInfo":
-            ShowEventInfo();
-            break;
-        //---------------------
-        case "SpotifySong":
-            SpotifySong();
-            break;
-        //---------------------
-        case "thisMovie":
-            thisMovie();
-            break;
-        //---------------------
-        case "DoWhatItSays":
-            DoWhatItSays();
-            break;
-            // cases for switching to initiated commands.
-        default:
-            console.log("choose a command: ShowEventInfo, SpotifySong, thisMovie, or DoWhatItSays");
-    };
-}
-
-function ShowEventInfo(event){
-    const date = moment(event.datetime, moment.ISO_8601).format('MM/DD/YYYY');
-    console.log('=/This_Concert/=');
-    console.log(`Lineup: ${(event.lineup).toString().replace(/,/g, ', ')}`);
-    console.log(`Venue: ${event.venue.name}`);
-    (event.venue.region !== "") ? console.log(`Location: ${event.venue.city}, ${event.venue.region}`) : 
-    console.log(`Location: ${event.venue.city},${event.venue.country}`);
-    console.log(`Date: ${date}`); console.log('');
-    fs.appendFile('log.txt', `\nLineup: ${(event.lineup).toString().replace(/,/g, ', ')}\nVenue: ${event.venue.name}\nLocation: 
-    ${event.venue.city}, ${event.venue.region}, ${event.venue.country}\nDate: ${date}\n\n`, (error) => {if(error) throw error;});
-}
-
-// function that will display spotify data
-function SpotifySong() {
-
-    const spotify = new Spotify(keys.spotify);
-    const args = process.argv;
-    const thesongName = "";
-
-    for (i = 3; i < args.length; i++) {
-        if (i > 3 && i < args.length) {
-            thesongName = thesongName + " " + args[i];
-        } else {
-            thesongName = args[i];
-        }
-    };
-    if (args.length < 4) {
-        thesongName = "I Want it That Way"
-        process.argv[3] = thesongName;
+// Writes to the log.txt file
+var getArtistNames = function(artist) {
+    return artist.name;
+  };
+  
+  // Function for running a Spotify search
+  var getMeSpotify = function(songName) {
+    if (songName === undefined) {
+      songName = "What's my age again";
     }
-    spotify.search({
+  
+    spotify.search(
+      {
         type: "track",
-        query: thesongName,
-        limit: 1
-    }, function (err, data) {
+        query: songName
+      },
+      function(err, data) {
         if (err) {
-            console.log("ya' messed up!: " + err);
-            return;
+          console.log("An Error occurred: " + err);
+          return;
         }
-        console.log("-------------------------------------------------------------------------------------------");
-        console.log("Artist: " + data.tracks.items[0].album.artists[0].name);
-        console.log("Song: " + data.tracks.items[0].name);
-        console.log("Preview link: " + data.tracks.items[0].external_urls.spotify);
-        console.log("Album: " + data.tracks.items[0].album.name);
-        console.log("-------------------------------------------------------------------------------------------");
+  
+        var songs = data.tracks.items;
+  
+        for (var i = 0; i < songs.length; i++) {
+          console.log(i);
+          console.log("artist(s): " + songs[i].artists.map(getArtistNames));
+          console.log("song name: " + songs[i].name);
+          console.log("preview song: " + songs[i].preview_url);
+          console.log("album: " + songs[i].album.name);
+          console.log("-----------------------------------");
+        }
+      }
+    );
+  };
+  
+  var getMyBands = function(artist) {
+    var queryURL = "https://rest.bandsintown.com/artists/" + artist + "/events?app_id=codingbootcamp";
+  
+    request(queryURL, function(error, response, body) {
+      if (!error && response.statusCode === 200) {
+        var jsonData = JSON.parse(body);
+  
+        if (!jsonData.length) {
+          console.log("No results found for " + artist);
+          return;
+        }
+  
+        console.log("Upcoming concerts for " + artist + ":");
+  
+        for (var i = 0; i < jsonData.length; i++) {
+          var show = jsonData[i];
+  
+          // Print data about each concert
+          // If a concert doesn't have a region, display the country instead
+          // Use moment to format the date
+          console.log(
+            show.venue.city +
+              "," +
+              (show.venue.region || show.venue.country) +
+              " at " +
+              show.venue.name +
+              " " +
+              moment(show.datetime).format("MM/DD/YYYY")
+          );
+        }
+      }
     });
-};
-
-// function that displays movie data
-function thisMovie() {
-
-    const args = process.argv;
-    const themovieName = "";
-
-    for (i = 3; i < args.length; i++) {
-        if (i > 3 && i < args.length) {
-            themovieName = themovieName + "+" + args[i];
-        } else {
-            themovieName = args[i];
-        }
-    };
-
-    if (themovieName === "") {
-        themovieName = "Mr." + "+" + "Nobody"
-    };
-
-    // running a single request to the OMDB API with the 'specified movie'
-    const queryUrl = "http://www.omdbapi.com/?t=" + themovieName + "&y=&plot=short&apikey=trilogy";
-
-    request(queryUrl, function (error, response, body) {
-        if (!error && response.statusCode === 200) {
-            console.log(`--------------------`);
-            console.log(`IMDB Rating: ${imdb}`);
-            console.log(`Movie Title: ${JSON.parse(body).Title}`);
-            console.log(`Release Year: ${JSON.parse(body).Year}`);
-            console.log(`Rotten Tomatoes Rating: ${rotten}`)
-            console.log(`Country: ${JSON.parse(body).Country}`);
-            console.log(`Language: ${JSON.parse(body).Language}`);
-            console.log(`Plot: ${JSON.parse(body).Plot}`);
-            console.log(`Actor(s): ${JSON.parse(body).Actors}`);
-            console.log(`--------------------`);
-        } else {
-            console.log("ya' messed up!");
-        }
+  };
+  
+  // Function for running a Movie Search
+  var getMeMovie = function(movieName) {
+    if (movieName === undefined) {
+      movieName = "Mr Nobody";
+    }
+  
+    var urlHit =
+      "http://www.omdbapi.com/?t=" + movieName + "&y=&plot=full&tomatoes=true&apikey=trilogy";
+  
+    request(urlHit, function(error, response, body) {
+      if (!error && response.statusCode === 200) {
+        var jsonData = JSON.parse(body);
+  
+        console.log("Title: " + jsonData.Title);
+        console.log("Year: " + jsonData.Year);
+        console.log("Rated: " + jsonData.Rated);
+        console.log("IMDB Rating: " + jsonData.imdbRating);
+        console.log("Country: " + jsonData.Country);
+        console.log("Language: " + jsonData.Language);
+        console.log("Plot: " + jsonData.Plot);
+        console.log("Actors: " + jsonData.Actors);
+        console.log("Rotten Tomatoes Rating: " + jsonData.Ratings[1].Value);
+      }
     });
-};
-
-// My random fs (dowhatitsays) function
-function DoWhatItSays() {
-
-    fs.readFile("./random.txt", "utf8", function (error, data) {
-        if(error) throw (error);
-        let LiriCommands = data.split(',');
-        for(const i in liriCommand){
-            LiriCommands[i] = LiriCommands[i].trim();   
-            LiriCommands[i] = LiriCommands[i].replace(/"/g, '');  
-        }
-        const data = data.split(',');
-        // Loop for my early established 'LiriComands'
-        LiriCommands(); 
-    })
-};
+  };
+  
+  // Function for running a command based on text file
+  var doWhatItSays = function() {
+    fs.readFile("random.txt", "utf8", function(error, data) {
+      console.log(data);
+  
+      var dataArr = data.split(",");
+  
+      if (dataArr.length === 2) {
+        pick(dataArr[0], dataArr[1]);
+      } else if (dataArr.length === 1) {
+        pick(dataArr[0]);
+      }
+    });
+  };
+  
+  // Function for determining which command is executed
+  var pick = function(caseData, functionData) {
+    switch (caseData) {
+    case "concert-this":
+      getMyBands(functionData);
+      break;
+    case "spotify-this-song":
+      getMeSpotify(functionData);
+      break;
+    case "movie-this":
+      getMeMovie(functionData);
+      break;
+    case "do-what-it-says":
+      doWhatItSays();
+      break;
+    default:
+      console.log("LIRI doesn't know that");
+    }
+  };
+  
+  // Function which takes in command line arguments and executes correct function accordingly
+  var runThis = function(argOne, argTwo) {
+    pick(argOne, argTwo);
+  };
+  
+  // MAIN PROCESS
+  // =====================================
+  runThis(process.argv[2], process.argv.slice(3).join(" "));
+  
